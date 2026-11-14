@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+    match /users/{uid} {
+      allow read, delete: if owner(uid);
+      allow create, update: if owner(uid)
+        && request.resource.data.keys().hasOnly(['displayName', 'provider', 'results', 'attempts', 'lastLoginAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 200
+        && request.resource.data.provider in ['guest', 'google']
+        && request.resource.data.results is map
+        && request.resource.data.results.size() <= 100
+        && request.resource.data.attempts is map
+        && request.resource.data.lastLoginAt == request.time;
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
