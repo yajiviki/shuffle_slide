@@ -147,7 +147,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       hinted = null;
     });
     await Future<void>.delayed(
-      Duration(milliseconds: store.settings['reduceMotion'] == true ? 0 : 130),
+      Duration(milliseconds: store.settings['reduceMotion'] == true ? 0 : 240),
     );
     if (!mounted) {
       return;
@@ -904,9 +904,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
     return AnimatedPositioned(
       key: ValueKey(tile),
       duration: Duration(
-        milliseconds: store.settings['reduceMotion'] == true ? 0 : 120,
+        milliseconds: store.settings['reduceMotion'] == true ? 0 : 220,
       ),
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeInOutCubic,
       left: index % size * step + gap / 2,
       top: index ~/ size * step + gap / 2,
       width: side,

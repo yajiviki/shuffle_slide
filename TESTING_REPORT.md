@@ -2,6 +2,8 @@
 
 Date: 13 November 2026 (Asia/Calcutta).
 
+Source updates: 14 November 2026. The UI and weekly leaderboard implementation described below were added after the executed checks in this report; they have not been re-analyzed or device-tested.
+
 **Delivery status: offline evaluation build. Production release acceptance is incomplete.** Flutter source and a signed-with-debug-key ARM64 APK are supplied. The APK has been built and structurally/signature-verified; it has **not** been launched on Android or installed on a phone.
 
 ## Executed environment
@@ -41,6 +43,7 @@ Date: 13 November 2026 (Asia/Calcutta).
 | Mode-specific progress / conflicts | PASS | Pure merge test preserves independent best score/stars/time/moves; idempotence and independent unlocks checked. |
 | Local persistence | PASS | Saved-attempt/settings/session roundtrip with mocked SharedPreferences; real Android disk/relaunch behavior not executed. |
 | Cloud sync / Firestore rules | BLOCKED | No real Firebase configuration or deployed test project. Rules supplied but not deployed or emulator-tested. |
+| Weekly leaderboard | NOT TESTED | Client-side weekly best-score entries support Google and Firebase Anonymous users. Rules and shared ranking UI are supplied; Firebase deployment, cross-account reads, and weekly rollover were not exercised. Scores are client-reported and can be forged. |
 | Result-card / native sharing | NOT TESTED | Implementation provided; result screen share button rendered. No real native share sheet or WhatsApp dispatch executed. |
 | Android Studio validation | NOT TESTED | Source includes generated Android Studio project; Gradle build executed via CLI only. |
 | APK package / ABI metadata | PASS | AAPT and ZIP inspection: com.rook.shuffleslide, v1.0.0 (1), SDK 24→36, ARM64-only native libraries, debuggable. |
@@ -66,9 +69,15 @@ Date: 13 November 2026 (Asia/Calcutta).
 2. Verify Anonymous and Google auth, account linking/reconciliation, cloud conflict handling and the reviewed security rules against the existing Firebase project.
 3. Provide the existing release signing configuration securely on the developer machine and verify its SHA-1/SHA-256 in Firebase.
 4. Run the supplied integration test and the README acceptance flow on an emulator and an actual phone, including real gallery photos, resume, offline/online sync, native sharing and release Google sign-in.
-5. Migrate the growing cloud attempt ledger out of the single profile document before high-volume production use. It currently has Firestore's 1 MiB document limit. No public leaderboard or server-authoritative score validation is implemented.
+5. Merge and validate the weekly leaderboard rules in the existing Firebase project. Add server-side score validation before treating rankings as competitive. Migrate the growing cloud attempt ledger out of the single profile document before high-volume production use; it currently has Firestore's 1 MiB document limit.
 
-AdMob, cloud photo backup and leaderboards are optional and omitted. Photos remain on-device; automatic cross-device transfer of imported images is intentionally absent.
+AdMob and cloud photo backup are omitted. Photos remain on-device; automatic cross-device transfer of imported images is intentionally absent.
+
+## Source updates after the recorded checks
+
+- Reworked the home screen into an image-led game menu with animated number and photo puzzle previews and a weekly trophy panel.
+- Added a weekly best-score Firestore collection for Google and Firebase-anonymous guest accounts, plus owner-scoped rules. The shared leaderboard requires the existing Firebase configuration and matching rules to be deployed.
+- Increased tile-slide animation duration and eased movement. These source updates were formatted but were not included in the earlier analysis, test, or build results above.
 
 ## Artifact
 

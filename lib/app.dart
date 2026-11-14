@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -193,17 +195,18 @@ class WelcomeScreen extends ConsumerWidget {
 }
 
 class MiniBoard extends StatelessWidget {
-  const MiniBoard({super.key});
+  final double size;
+  const MiniBoard({super.key, this.size = 172});
   @override
   Widget build(BuildContext context) => Transform.rotate(
     angle: -.08,
     child: SizedBox(
-      width: 172,
-      height: 172,
+      width: size,
+      height: size,
       child: GridView.count(
         crossAxisCount: 3,
-        mainAxisSpacing: 7,
-        crossAxisSpacing: 7,
+        mainAxisSpacing: size / 24,
+        crossAxisSpacing: size / 24,
         physics: const NeverScrollableScrollPhysics(),
         children: [1, 2, 3, 4, 0, 5, 7, 8, 6]
             .map(
@@ -214,14 +217,14 @@ class MiniBoard extends StatelessWidget {
                       : v == 5
                       ? violet
                       : orange,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(size / 14),
                 ),
                 child: Center(
                   child: Text(
                     v == 0 ? '' : '$v',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Color(0xff252032),
-                      fontSize: 27,
+                      fontSize: size / 6.4,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -230,6 +233,292 @@ class MiniBoard extends StatelessWidget {
             )
             .toList(),
       ),
+    ),
+  );
+}
+
+class PuzzlePreview extends StatefulWidget {
+  final PuzzleMode mode;
+  final Color accent;
+  const PuzzlePreview({super.key, required this.mode, required this.accent});
+  @override
+  State<PuzzlePreview> createState() => _PuzzlePreviewState();
+}
+
+class _PuzzlePreviewState extends State<PuzzlePreview> {
+  late final Timer timer;
+  final tiles = [1, 2, 3, 4, 5, 6, 7, 0, 8];
+  @override
+  void initState() {
+    super.initState();
+    timer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+      if (!mounted) return;
+      setState(() {
+        final empty = tiles.indexOf(0);
+        final next = empty == 7 ? 8 : 7;
+        tiles[empty] = tiles[next];
+        tiles[next] = 0;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      final side = min(132.0, box.maxHeight - 25);
+      const spacing = 5.0;
+      final tileSide = (side - spacing * 2) / 3;
+      return Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              widget.accent.withValues(alpha: .30),
+              const Color(0xff29283f),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned(
+              left: 16,
+              top: 14,
+              child: Text(
+                widget.mode == PuzzleMode.number
+                    ? 'CLASSIC MODE'
+                    : 'YOUR PHOTO, YOUR PUZZLE',
+                style: TextStyle(
+                  color: widget.accent,
+                  fontSize: 9,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: side,
+              height: side,
+              child: Stack(
+                children: [
+                  for (final tile in tiles.where((tile) => tile != 0))
+                    AnimatedPositioned(
+                      key: ValueKey(tile),
+                      duration: const Duration(milliseconds: 480),
+                      curve: Curves.easeInOutCubic,
+                      left: tiles.indexOf(tile) % 3 * (tileSide + spacing),
+                      top: tiles.indexOf(tile) ~/ 3 * (tileSide + spacing),
+                      width: tileSide,
+                      height: tileSide,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          color: widget.mode == PuzzleMode.number
+                              ? (tile == 5 ? violet : orange)
+                              : null,
+                          gradient: widget.mode == PuzzleMode.photo
+                              ? LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    [
+                                      const Color(0xfff3ba78),
+                                      const Color(0xffbf899f),
+                                      const Color(0xff7483ad),
+                                      const Color(0xff3b6680),
+                                    ][tile % 4],
+                                    [
+                                      const Color(0xff8d758d),
+                                      const Color(0xff6e9e9c),
+                                      const Color(0xffdbad75),
+                                      const Color(0xff333e67),
+                                    ][(tile + 1) % 4],
+                                  ],
+                                )
+                              : null,
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x33000000),
+                              blurRadius: 5,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: widget.mode == PuzzleMode.number
+                            ? Center(
+                                child: Text(
+                                  '$tile',
+                                  style: const TextStyle(
+                                    color: Color(0xff35253a),
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 21,
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Icon(
+                                  [
+                                    Icons.landscape_rounded,
+                                    Icons.wb_sunny_rounded,
+                                    Icons.water_rounded,
+                                  ][tile % 3],
+                                  color: Colors.white.withValues(alpha: .78),
+                                  size: 19,
+                                ),
+                              ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class WeeklyLeaderboard extends StatelessWidget {
+  final GameStore store;
+  const WeeklyLeaderboard({super.key, required this.store});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: const Color(0xff22253a),
+      borderRadius: BorderRadius.circular(24),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: orange.withValues(alpha: .16),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(Icons.emoji_events_rounded, color: orange),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'WEEKLY CHAMPIONS',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Best puzzle score  ·  ${store.leaderboardWeek}',
+                    style: const TextStyle(color: muted, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.military_tech_rounded, color: orange, size: 28),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (!store.firebaseReady)
+          const Text(
+            'Play is ready offline. Online weekly rankings become available when cloud sync is connected.',
+            style: TextStyle(color: muted, fontSize: 11, height: 1.5),
+          )
+        else
+          StreamBuilder<List<Map<String, dynamic>>>(
+            stream: store.weeklyLeaderboard(),
+            builder: (context, snapshot) {
+              final rows = snapshot.data ?? const <Map<String, dynamic>>[];
+              if (snapshot.hasError)
+                return const Text(
+                  'Leaderboard is temporarily unavailable.',
+                  style: TextStyle(color: muted, fontSize: 11),
+                );
+              if (rows.isEmpty)
+                return Text(
+                  snapshot.connectionState == ConnectionState.waiting
+                      ? 'Loading this week’s scores…'
+                      : 'No scores yet. Finish a puzzle to claim the first trophy!',
+                  style: const TextStyle(
+                    color: muted,
+                    fontSize: 11,
+                    height: 1.5,
+                  ),
+                );
+              return Column(
+                children: [
+                  for (var i = 0; i < min(rows.length, 5); i++)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 25,
+                            child: Text(
+                              '${i + 1}',
+                              style: TextStyle(
+                                color: i == 0 ? orange : muted,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: i == 0
+                                ? orange.withValues(alpha: .2)
+                                : const Color(0xff30334a),
+                            child: Icon(
+                              i == 0
+                                  ? Icons.emoji_events_rounded
+                                  : Icons.person_rounded,
+                              size: 15,
+                              color: i == 0 ? orange : muted,
+                            ),
+                          ),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Text(
+                              rows[i]['displayName'] as String? ?? 'Player',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${rows[i]['score'] ?? 0}',
+                            style: const TextStyle(
+                              color: orange,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+      ],
     ),
   );
 }
@@ -283,7 +572,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget home(GameStore store) => ListView(
-    padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
     children: [
       Row(
         children: [
@@ -321,22 +610,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
-      const SizedBox(height: 34),
-      const Text(
-        'Make your\nnext move.',
-        style: TextStyle(
-          fontSize: 43,
-          height: 1.08,
-          letterSpacing: -1.7,
-          fontWeight: FontWeight.w800,
+      const SizedBox(height: 20),
+      Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: const LinearGradient(
+            colors: [Color(0xff45325f), Color(0xff26253d), Color(0xff202338)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'READY, PLAYER?',
+                    style: TextStyle(
+                      color: orange,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.5,
+                      fontSize: 10,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Pick your\nnext puzzle.',
+                    style: TextStyle(
+                      fontSize: 29,
+                      height: 1.08,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -.8,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '${store.totalStars} stars  ·  ${store.completed} levels cleared',
+                    style: const TextStyle(
+                      color: Color(0xffc3c0d1),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            const MiniBoard(size: 104),
+          ],
         ),
       ),
-      const SizedBox(height: 12),
-      const Text(
-        'A little focus. A satisfying finish.',
-        style: TextStyle(color: muted, fontSize: 15),
-      ),
-      const SizedBox(height: 26),
+      const SizedBox(height: 24),
       Row(
         children: [
           Expanded(
@@ -373,23 +699,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ],
-      const SizedBox(height: 30),
+      const SizedBox(height: 24),
       const Row(
         children: [
           Expanded(
             child: Text(
-              'CHOOSE YOUR CHALLENGE',
+              'CHOOSE YOUR GAME',
               style: TextStyle(fontSize: 11, letterSpacing: 1.8, color: muted),
             ),
           ),
-          Text('02 MODES', style: TextStyle(fontSize: 10, color: muted)),
+          Text('TAP TO PLAY', style: TextStyle(fontSize: 10, color: muted)),
         ],
       ),
       const SizedBox(height: 16),
       modeCard(
         PuzzleMode.number,
-        'The classic,\nwith a twist.',
-        'Slide the numbers into the correct order.\nBeat the clock and challenge your brain!',
+        'Number Puzzle',
+        'Put every tile in its place. Can you beat the clock?',
         orange,
         Icons.apps_rounded,
         store,
@@ -397,12 +723,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       const SizedBox(height: 16),
       modeCard(
         PuzzleMode.photo,
-        'Your memories.\nRemixed.',
-        'Turn your favorite photos into puzzles.\nShuffle, slide, and restore the original picture!',
+        'Photo Puzzle',
+        'Mix up a favorite photo, then bring the picture back.',
         violet,
         Icons.landscape_outlined,
         store,
       ),
+      const SizedBox(height: 22),
+      WeeklyLeaderboard(store: store),
       const SizedBox(height: 24),
       const Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -454,71 +782,69 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     GameStore store,
   ) => Card(
     margin: EdgeInsets.zero,
+    clipBehavior: Clip.antiAlias,
     child: InkWell(
-      borderRadius: BorderRadius.circular(24),
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => LevelScreen(mode: mode)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(23),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 174,
+            child: PuzzlePreview(mode: mode, accent: color),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+            child: Row(
               children: [
-                Icon(icon, color: color, size: 28),
-                const SizedBox(width: 10),
-                Text(
-                  mode == PuzzleMode.number ? 'NUMBER PUZZLE' : 'PHOTO PUZZLE',
-                  style: TextStyle(
-                    color: color,
-                    letterSpacing: 1.4,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        description,
+                        style: const TextStyle(
+                          color: muted,
+                          fontSize: 11,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${unlockedLevel(store.results, mode) - 1} levels cleared  ·  50 levels',
+                        style: const TextStyle(color: muted, fontSize: 10),
+                      ),
+                    ],
                   ),
                 ),
-                const Spacer(),
-                const Icon(Icons.north_east, color: muted, size: 20),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 29,
-                fontWeight: FontWeight.w700,
-                height: 1.13,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              description,
-              style: const TextStyle(color: muted, fontSize: 12, height: 1.6),
-            ),
-            const SizedBox(height: 22),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  mode == PuzzleMode.number
-                      ? 'Play Number Puzzle'
-                      : 'Play Photo Puzzle',
-                  style: TextStyle(
+                const SizedBox(width: 12),
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
                     color: color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Color(0xff251a17),
+                    size: 30,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '50 levels · ${unlockedLevel(store.results, mode) - 1} solved',
-                  style: const TextStyle(color: muted, fontSize: 10),
-                ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );

@@ -33,6 +33,7 @@ class GameStore extends ChangeNotifier {
   bool guest = false;
   bool _syncing = false;
   bool _syncAgain = false;
+  Future<void>? _anonymousSignIn;
   Future<void> _writes = Future.value();
   GameStore(this.prefs) {
     try {
@@ -69,6 +70,73 @@ class GameStore extends ChangeNotifier {
   int get completed => results.length;
   int get totalScore =>
       results.values.fold(0, (int sum, e) => sum + (e['score'] as int));
+  String get leaderboardWeek {
+    final now = DateTime.now();
+    final thursday = now.add(Duration(days: 4 - now.weekday));
+    final dayOfYear = thursday.difference(DateTime(thursday.year, 1, 1)).inDays + 1;
+    final week = (dayOfYear + 10 - thursday.weekday) ~/ 7;
+    return '${thursday.year}-W${week.toString().padLeft(2, '0')}';
+  }
+
+  Stream<List<Map<String, dynamic>>> weeklyLeaderboard() {
+    if (!firebaseReady || user == null) return Stream.value(const []);
+    return FirebaseFirestore.instance
+        .collection('weeklyLeaderboards')
+        .doc(leaderboardWeek)
+        .collection('players')
+        .orderBy('score', descending: true)
+        .limit(10)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => {...doc.data(), 'playerId': doc.id})
+            .toList());
+  }
+
+  Future<void> _ensureAnonymousUser() {
+    if (!firebaseReady || user != null || !guest) return Future.value();
+    final pending = _anonymousSignIn;
+    if (pending != null) return pending;
+    late final Future<void> signIn;
+    signIn = FirebaseAuth.instance
+        .signInAnonymously()
+        .timeout(const Duration(seconds: 15))
+        .then((_) {})
+        .whenComplete(() {
+          if (identical(_anonymousSignIn, signIn)) _anonymousSignIn = null;
+        });
+    _anonymousSignIn = signIn;
+    return signIn;
+  }
+
+  Future<void> submitWeeklyScore(Attempt attempt) async {
+    if (!firebaseReady) return;
+    try {
+      await _ensureAnonymousUser();
+      final uid = user?.uid;
+      if (uid == null) return;
+      final ref = FirebaseFirestore.instance
+          .collection('weeklyLeaderboards')
+          .doc(leaderboardWeek)
+          .collection('players')
+          .doc(uid);
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final snapshot = await tx.get(ref);
+        final previous = snapshot.data()?['score'] as int? ?? -1;
+        if (attempt.finalScore > previous) {
+          final playerName = user?.isAnonymous == false && name != 'Guest explorer'
+              ? name
+              : 'Player ${uid.substring(0, 4).toUpperCase()}';
+          tx.set(ref, {
+            'displayName': playerName,
+            'score': attempt.finalScore,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }).timeout(const Duration(seconds: 15));
+    } catch (_) {
+      // A failed leaderboard write must never interrupt a completed game.
+    }
+  }
   Future<void> initialize() async {
     try {
       // Native configuration is supplied by the owner's Firebase project.
@@ -180,11 +248,7 @@ class GameStore extends ChangeNotifier {
     }
     _syncing = true;
     try {
-      if (user == null && guest) {
-        await FirebaseAuth.instance.signInAnonymously().timeout(
-          const Duration(seconds: 15),
-        );
-      }
+      await _ensureAnonymousUser();
       final uid = user?.uid;
       if (uid == null) {
         return;
@@ -253,6 +317,7 @@ class GameStore extends ChangeNotifier {
     await persist();
     notifyListeners();
     unawaited(sync());
+    unawaited(submitWeeklyScore(attempt));
     return best;
   }
 

@@ -11,11 +11,13 @@ Flutter mobile game with 50 Number levels and 50 Photo levels. Android is the im
 - Native gallery picker, square crop, bounded image decode, one shared cached photo provider per board, reusable private local copies, removal, and a generated mountain sample.
 - Original-photo reference thumbnail and larger preview; tutorial previews are free, regular previews cost 50 points and close after 3 seconds, expert levels allow one larger preview. Timer continues while viewing a reference.
 - Offline guest profile, local progress/settings/session persistence, statistics and derived achievements.
+- Image-led home screen with animated number/photo puzzle previews and smoother tile sliding.
 - Firebase Anonymous login, Google authentication, anonymous account linking, explicit merge consent, transaction-based best-result reconciliation, and cloud retry on completion, app resume, or Sync.
+- Weekly best-score leaderboard for Google and Firebase-anonymous players, with trophy styling and guest aliases.
 - Native share sheet with a generated PNG achievement card; personal photo inclusion is opt-in. No invented app-download URL. App never sends a message automatically.
 - Light/dark appearance, reduced motion, larger text, system click sounds, haptics, and accessibility labels.
 
-AdMob, leaderboards, photo cloud backup, and app-store publication are optional and were not implemented. Photos are never written to Firestore.
+AdMob, photo cloud backup, and app-store publication are omitted. Photos are never written to Firestore. The weekly leaderboard requires the existing Firebase project and rules below; it is not available in offline-only builds.
 
 ## Toolchain
 
@@ -56,14 +58,14 @@ Offline gameplay works with no Firebase files. Google and cloud features display
 5. For iOS, add the owner's `GoogleService-Info.plist` to the Runner target in Xcode and the existing `REVERSED_CLIENT_ID` URL scheme. Reuse the existing OAuth setup. Build on macOS; iOS was not compiled here.
 6. Inspect Authentication → Sign-in method in the **existing** Firebase project. Google is already enabled according to the brief. Enable Anonymous only if it is currently disabled.
 7. Run `cd android; .\gradlew signingReport` (PowerShell) and compare debug and release SHA-1/SHA-256 fingerprints with that existing Firebase Android app. Add missing fingerprints, then download its refreshed JSON if needed. Confirm an OAuth **web client** is present for Google ID tokens. No server client ID is invented or embedded by this app.
-8. Review the owner-only `/users/{uid}` block in `firestore.rules` and **merge it into the existing project's rules**, preserving unrelated collections. Do not overwrite existing production rules wholesale. No rules were deployed here.
+8. Review both the owner-only `/users/{uid}` block and `/weeklyLeaderboards/{week}/players/{uid}` block in `firestore.rules`. The latter permits authenticated reads and owner-only writes, including Firebase Anonymous players. **Merge both into the existing project's rules**, preserving unrelated collections. Do not overwrite existing production rules wholesale. No rules were deployed here.
 9. On an actual device, verify guest login, fresh Google login, cancellation, anonymous upgrade, an existing-account merge, offline-to-online sync, and release-signed Google login.
 
 ### Data and merge policy
 
 `users/{uid}` stores displayName, provider, lastLoginAt, `results`, and an idempotent `attempts` map. Result keys are `number_1` through `number_50` and `photo_1` through `photo_50`. Each stores score, stars, time, and moves. Merging preserves maximum score/stars and minimum completion time/moves independently. Unlocks and achievements are derived from completed-level records. Local writes happen first; failed sync leaves local data intact.
 
-The compact document schema differs from the suggested subcollection layout but keeps modes independent. The attempt ledger grows with completed attempts; **migrate it to per-attempt subcollections before high-volume production use** to avoid Firestore's 1 MiB document limit. Scores are client-computed and unsuitable for a competitive public leaderboard without server validation. The rules enforce ownership and top-level schema; their Firebase Emulator/production behavior remains unverified.
+The compact document schema differs from the suggested subcollection layout but keeps modes independent. The attempt ledger grows with completed attempts; **migrate it to per-attempt subcollections before high-volume production use** to avoid Firestore's 1 MiB document limit. Weekly leaderboard scores are client-computed and can be forged; use server-side validation before treating rankings as competitive. The rules enforce entry ownership and schema but do not verify gameplay. Their Firebase Emulator/production behavior remains unverified.
 
 Signing out retains device progress, as labeled in the UI. Connecting another Google account explicitly offers to merge that device progress. Imported photos remain local, including when scores synchronize to another device. Account deletion requires recent authentication; a failed deletion retains local progress. Cloud deletion and Firebase Auth deletion are separate service operations and must be tested against the real project.
 
