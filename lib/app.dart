@@ -445,12 +445,13 @@ class WeeklyLeaderboard extends StatelessWidget {
             stream: store.weeklyLeaderboard(),
             builder: (context, snapshot) {
               final rows = snapshot.data ?? const <Map<String, dynamic>>[];
-              if (snapshot.hasError)
+              if (snapshot.hasError) {
                 return const Text(
                   'Leaderboard is temporarily unavailable.',
                   style: TextStyle(color: muted, fontSize: 11),
                 );
-              if (rows.isEmpty)
+              }
+              if (rows.isEmpty) {
                 return Text(
                   snapshot.connectionState == ConnectionState.waiting
                       ? 'Loading this week’s scores…'
@@ -461,6 +462,7 @@ class WeeklyLeaderboard extends StatelessWidget {
                     height: 1.5,
                   ),
                 );
+              }
               return Column(
                 children: [
                   for (var i = 0; i < min(rows.length, 5); i++)
